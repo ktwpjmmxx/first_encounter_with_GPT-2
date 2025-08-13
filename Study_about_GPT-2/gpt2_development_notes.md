@@ -219,3 +219,152 @@ random.seed(42)
 答えが **"42"** だった というシュールなオチ。
 
 その意味は最後まで明かされず、「答えは42」というジョークとして有名に。
+
+---
+
+## ② モデルとトークナイザーの詳細設定
+
+### 🎯 GPT-2のサイズ
+
+1. **GPT-2 (124M パラメータ)** : 最小サイズ、Colabで安定動作
+2. **GPT-2-medium (355M パラメータ)** : より高品質だがメモリ使用量大
+3. **GPT-2-large (774M パラメータ)** : さらに高品質だがColab無料版では厳しい
+
+### 🤖 コードブロック3
+
+```python
+model_name = "gpt2"
+print(f"モデル '{model_name}' を読み込み中...")
+
+try:
+    tokenizer = GPT2Tokenizer.from_pretrained(model_name)
+    
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+        print("パディングトークンをEOSトークンに設定しました。")
+    
+    model = GPT2LMHeadModel.from_pretrained(model_name)
+    model.to(device)
+    
+    total_params = sum(p.numel() for p in model.parameters())
+    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    
+    print(f"モデル読み込み完了!")
+    print(f"総パラメータ数: {total_params:,}")
+    print(f"学習対象パラメータ数: {trainable_params:,}")
+
+except Exception as e:
+    print(f"モデル読み込みエラー: {e}")
+    print("インターネット接続またはHugging Faceのサーバー状況を確認してください。")
+```
+
+### 📊 コード概要
+
+#### 【モデルサイズの選択】
+
+```python
+model_name = "gpt2"
+print(f"モデル '{model_name}' を読み込み中...")
+```
+
+→ `model_name` に "gpt2" を指定
+Hugging Faceのモデル名で、この場合は一番小さいGPT-2（約1.24億パラメータ）を使う
+他には"gpt2-medium", "gpt2-large", "gpt2-xl" などがある
+
+#### 【トークナイザーの読み込み】
+
+```python
+tokenizer = GPT2Tokenizer.from_pretrained(model_name)
+```
+→ Hugging FaceからGPT-2用のBPEトークナイザーをロード
+　`from_pretrained`...ネットからモデルや辞書ファイルをダウンロードしてキャッシュに保存
+
+#### 【パディングトークンの設定】
+
+```python
+if tokenizer.pad_token is None:
+    tokenizer.pad_token = tokenizer.eos_token
+    print("パディングトークンをEOSトークンに設定しました。")
+```
+
+→ GPT-2にはパディング用トークンが存在しない（BERTみたいな[PAD]なし）
+　バッチ学習で長さを揃えるため、代わりに文末トークン（eos_token）を流用する
+
+#### 【モデル本体の読み込み】
+
+```python
+model = GPT2LMHeadModel.from_pretrained(model_name)
+```
+→ GPT-2の「言語モデル」部分をロード（LMHeadは単語予測用の最終層を含む構造）
+　事前学習済みの重みも一緒に読み込む
+
+#### 【デバイスに移動】
+
+```python
+model.to(device)
+```
+→ GPUがあればGPUメモリへ転送して計算を高速化。CPUの場合はメモリ上で計算（遅くなる）。
+
+#### 【パラメータ数の表示】
+
+```python
+total_params = sum(p.numel() for p in model.parameters())
+trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+```
+
+→ **総パラメータ数**: モデル全体の重みの数。
+
+　**学習対象パラメータ数**: 勾配計算が有効（requires_grad=True）なパラメータ数。
+
+　転移学習や微調整（fine-tuning）の時、固定されてる層があるとこの値は減る。
+
+#### 【例外処理】
+
+```python
+except Exception as e:
+    print(f"モデル読み込みエラー: {e}")
+    print("インターネット接続またはHugging Faceのサーバー状況を確認してください。")
+```
+
+→ モデルやトークナイザーのロードが失敗したときにエラー原因を表示。
+　ネット接続やHugging Face側の障害もここで検知。
+
+### ◆ コードブロック3の全体の解釈
+
+全体的に初期のセットアップ工程
+
+1. **モデルサイズ選択**
+2. **トークナイザー準備**（パディング設定含む）
+3. **モデル読み込み**
+4. **デバイス転送 & パラメータ数確認**
+
+#### 📝 【備忘録】
+
+**パディングについて**
+
+```python
+if tokenizer.pad_token is None:
+    tokenizer.pad_token = tokenizer.eos_token
+```
+
+**GPT-2はpad_tokenを持ってない**
+- GPT-2は言語生成モデルなので、「途中で埋める」という発想がなく、`pad_token` が None（未定義）。なので、このまま`padding=True`で使おうとするとエラーになる
+
+**EOSトークンを代わりに使う理由**
+- GPT-2では**`<eos>`（End Of Sequence）**が「文の終わり」を表す唯一の特別トークン。
+- バッチ入力でパディングが必要な場合、`pad_token` の代わりに `eos_token` を使うのが一般的な対処法
+
+- 言語モデルは基本的に「終わった後の空白部分」は学習に影響しにくい（attention_maskで無視できる）
+- pad専用トークンを作るより、既存のEOSを使ったほうがシンプルで安全
+
+**まとめ**
+- GPT-2には`pad_token`がない → 代わりに`eos_token`を設定
+- これで`padding=True`が使えるようになり、Trainerやデータローダーがバッチ化できる
+- 実際の計算では`attention_mask`がpad部分を無視する
+
+**パラメーター数の表示について**
+
+```python
+total_params = sum(p.numel() for p in model.parameters())
+trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+```
