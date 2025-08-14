@@ -515,3 +515,26 @@ for i, conv in enumerate(conversations[:3]):
 最初の3件だけサンプルとして表示。
 enumerate で番号を付けながら user と bot の内容を整形して出力。
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
