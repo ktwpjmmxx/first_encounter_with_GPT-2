@@ -1,0 +1,55 @@
+gpt2-chatbot/
+├── README.md
+├── requirements.txt
+├── .gitignore
+├── config/
+│   └── config.yaml
+├── data/
+│   └── sample_dialogs.json
+├── model/
+│   ├── train.py
+│   ├── inference.py
+│   └── utils.py
+├── notebooks/
+│   └── exploration.ipynb
+├── app/
+│   ├── main.py
+│   └── interface.py
+├── assets/
+│   └── demo.gif
+└── tests/
+    └── test_inference.py
+
+
+
+
+各フォルダ・ファイルの役割
+README.md
+プロジェクトの概要、使い方、依存関係、デモGIFなどを記載。
+
+requirements.txt
+必要なPythonライブラリ（例：transformers, torch, flaskなど）を記載。
+
+.gitignore
+キャッシュやモデルファイルなど、Git管理対象外にするものを記載。
+
+config/
+モデルやアプリの設定ファイル（YAML形式など）を格納。
+
+data/
+学習やテストに使うダイアログデータなどを格納。
+
+model/
+GPT-2のファインチューニング、推論、ユーティリティ関数を管理。
+
+notebooks/
+Colabなどでの実験・可視化用ノートブック。
+
+app/
+実際のチャットボットアプリケーションのコード（CLIやWeb UIなど）。
+
+assets/
+デモ動画、画像、UIスクリーンショットなど。
+
+tests/
+単体テストや推論のテストコード。
