@@ -927,6 +927,433 @@ train_dataset = Dataset.from_dict({
 - 入力シーケンスを1つ右にシフトしたものが正解ラベルになる
 
 
+### コードブロック7
+
+def create_training_arguments(output_dir: str = './gpt2-chatbot') -> TrainingArguments:
+    """
+    Google Colab環境に最適化された学習設定を作成
+    """
+    return TrainingArguments(
+        # 出力設定
+        output_dir=output_dir,
+        overwrite_output_dir=True,
+        
+        # 学習パラメータ
+        num_train_epochs=5,  # エポック数を増加
+        per_device_train_batch_size=1,  # Colabメモリ制限対応
+        gradient_accumulation_steps=8,  # 実効バッチサイズ = 1 * 8 = 8
+        
+        # 最適化設定
+        learning_rate=3e-5,  # GPT-2に適した学習率
+        weight_decay=0.01,   # 過学習防止
+        warmup_steps=200,    # ウォームアップステップ
+        
+        # 保存とログ設定
+        save_strategy="steps",
+        save_steps=100,
+        save_total_limit=3,  # 保存モデル数制限（ストレージ節約）
+        logging_dir=f'{output_dir}/logs',
+        logging_steps=20,
+        
+        # 評価設定（今回は訓練データのみのため無効化）
+        evaluation_strategy="no",
+        
+        # パフォーマンス最適化
+        dataloader_pin_memory=True,
+        dataloader_num_workers=2,
+        
+        # Mixed Precision Training (GPU高速化)
+        fp16=torch.cuda.is_available(),
+        
+        # その他
+        report_to=None,  # WandBなどのログサービス無効化
+        seed=42,
+    )
+
+# 学習設定作成
+training_args = create_training_arguments()
+
+# データコレーター設定
+data_collator = DataCollatorForLanguageModeling(
+    tokenizer=tokenizer,
+    mlm=False,  # GPT-2はCausal LM（次の単語予測）なのでMLMは無効
+    return_tensors="pt"
+)
+
+print("学習設定完了:")
+print(f"  エポック数: {training_args.num_train_epochs}")
+print(f"  バッチサイズ: {training_args.per_device_train_batch_size}")
+print(f"  勾配累積: {training_args.gradient_accumulation_steps}")
+print(f"  学習率: {training_args.learning_rate}")
+print(f"  FP16: {training_args.fp16}")
+
+### コード概要
+
+#### 【関数 create_training_arguments】
+
+def create_training_arguments(output_dir: str = './gpt2-chatbot') -> TrainingArguments:
+    return TrainingArguments(
+        ...
+    )
+
+→Hugging Face Trainer に渡す 学習のパラメータ設定 を作成
+　output_dir → 学習結果やログの保存先を指定。
+　overwrite_output_dir=True → 既存のフォルダを上書き可能。
+
+
+#### 【学習パラメータ】
+
+num_train_epochs=5,
+per_device_train_batch_size=1,
+gradient_accumulation_steps=8,
+
+→エポックを5に設定
+→バッチサイズを1に設定
+→勾配を8回貯めてからの更新に設定
+
+
+#### 【最適化設定】
+
+learning_rate=3e-5,
+weight_decay=0.01,
+warmup_steps=200,
+
+→「learning_rate=3e-5」
+学習率は「勾配でどれくらい重みを更新するか」の大きさ
+GPT-2などの事前学習済みモデルはすでに良い表現を持っているので、
+→ 学習率が大きすぎると知識を壊す（catastrophic forgetting）。
+→ 小さすぎると学習が進まない。
+3e-5 は 微調整(fine-tuning)の定番値
+
+→「weight_decay=0.01」
+L2正則化 の一種で、モデルの重みを大きくしすぎないように抑える。
+過学習（trainデータにピッタリ合いすぎて未知データに弱くなる現象）を軽減する役割
+
+→「warmup_steps=200」
+学習開始直後に「いきなり大きな学習率で更新すると不安定」になるので、最初の200ステップは徐々に学習率を上げていく
+
+
+
+#### 【保存とログ】
+
+save_strategy="steps",
+save_steps=100,
+save_total_limit=3,
+logging_dir=f'{output_dir}/logs',
+logging_steps=20,
+
+→「save_strategy="steps"」
+モデルをどのタイミングで保存するかを指定
+"steps" は「一定ステップごと」
+
+・save_steps=100→100ステップごとに保存
+・save_total_limit=3→古いものから自動で消してストレージを節約
+
+→「logging_dir=f'{output_dir}/logs'」
+TensorBoardなどで可視化できるログの保存先
+ロスや学習率の変化をグラフ化できる
+
+→「logging_steps=20」
+20ステップごとにログを出力
+
+#### 【評価設定】
+
+evaluation_strategy="no",
+
+→今回は「訓練データだけで学習する」ため、検証（evaluation）は無効化。
+
+#### 【パフォーマンス最適化】
+
+dataloader_pin_memory=True,
+dataloader_num_workers=2,
+fp16=torch.cuda.is_available(),
+
+→pin_memory=True: DataLoaderを高速化。
+→num_workers=2: 並列でデータ読み込み。
+→fp16: 半精度浮動小数点で学習（GPUで高速化＆メモリ削減）。
+→ Colab GPUが対応していれば自動でON。
+
+#### 【ログ出力サービス無効化】
+
+report_to=None,
+seed=42,
+
+→report_to=None: Weights & Biases などの外部ログ連携を無効化（Colabで不要）。
+→seed=42: 再現性確保のため乱数シード固定。
+
+#### 【データコレーター設定】
+
+data_collator = DataCollatorForLanguageModeling(
+    tokenizer=tokenizer,
+    mlm=False,
+    return_tensors="pt"
+)
+
+学習バッチの作り方 を指定する部分
+→mlm=False → GPT-2は「次の単語予測（Causal LM）」だから、BERT方式のマスク言語モデルは使わない
+→return_tensors="pt" → PyTorchテンソルで返す
+
+#### 【確認出力】
+
+print("学習設定完了:")
+print(f"  エポック数: {training_args.num_train_epochs}")
+print(f"  バッチサイズ: {training_args.per_device_train_batch_size}")
+print(f"  勾配累積: {training_args.gradient_accumulation_steps}")
+print(f"  学習率: {training_args.learning_rate}")
+print(f"  FP16: {training_args.fp16}")
+
+→設定が意図通りに反映されているかチェック。
+
+
+### ◆ コードブロック7の全体の解釈
+
+Colab環境でGPT-2を安定的かつ効率的に学習させるためのTrainer設定を作っている部分
+・TrainingArguments で学習の基本パラメータを定義
+・DataCollator で「学習データのまとめ方」を指定
+・最後に設定を出力して確認
+
+
+#### 【備忘録】
+
+①L2正則化→重み（パラメータ）が大きくなりすぎないようにペナルティをかける仕組み
+もし重みが大きくなりすぎると：
+
+特定の入力に過敏に反応してしまう
+
+訓練データには強くフィットするが、未知データには弱くなる
+→ 過学習（overfitting） が起きる。
+
+
+### コードブロック8
+
+def train_chatbot_model(model, tokenizer, train_dataset, training_args, data_collator):
+    """
+    エラーハンドリングを含む堅牢な学習関数
+    """
+    # トレーナーの初期化
+    trainer = Trainer(
+        model=model,
+        args=training_args,
+        train_dataset=train_dataset,
+        data_collator=data_collator,
+        tokenizer=tokenizer,
+    )
+    
+    print("=== ファインチューニング開始 ===")
+    print(f"学習データ数: {len(train_dataset)}")
+    print(f"推定学習時間: {len(train_dataset) * training_args.num_train_epochs // (training_args.per_device_train_batch_size * training_args.gradient_accumulation_steps)} ステップ")
+    
+    try:
+        # 学習実行
+        start_time = datetime.now()
+        model.train()
+        
+        # 学習履歴を取得
+        train_result = trainer.train()
+        
+        end_time = datetime.now()
+        training_duration = end_time - start_time
+        
+        print(f"\n=== 学習完了 ===")
+        print(f"学習時間: {training_duration}")
+        print(f"最終損失: {train_result.training_loss:.4f}")
+        
+        # モデル保存
+        print("モデルを保存中...")
+        trainer.save_model()
+        tokenizer.save_pretrained(training_args.output_dir)
+        
+        # 学習履歴保存
+        train_history = {
+            'training_loss': train_result.training_loss,
+            'training_duration': str(training_duration),
+            'num_epochs': training_args.num_train_epochs,
+            'learning_rate': training_args.learning_rate,
+        }
+        
+        with open(f"{training_args.output_dir}/training_history.json", 'w') as f:
+            json.dump(train_history, f, indent=2)
+        
+        print(f"モデルとトークナイザーを '{training_args.output_dir}' に保存しました")
+        
+        return trainer, train_result
+        
+    except Exception as e:
+        print(f"学習中にエラーが発生: {e}")
+        print("メモリ不足の場合は、バッチサイズを小さくするか、max_lengthを短くしてください")
+        raise
+
+# 学習実行
+trainer, train_result = train_chatbot_model(
+    model=model,
+    tokenizer=tokenizer,
+    train_dataset=train_dataset,
+    training_args=training_args,
+    data_collator=data_collator
+)
+
+
+
+### コード概要
+
+#### 【関数定義】
+
+def train_chatbot_model(model, tokenizer, train_dataset, training_args, data_collator):
+
+→引数一覧
+
+・model：学習対象のGPT-2モデル
+・tokenizer：トークナイザー
+・train_dataset：Dataset形式の学習データ
+・training_args：TrainingArguments（学習設定）
+・data_collator：バッチ作成ルール
+
+#### 【トレーナー初期化】
+
+trainer = Trainer(
+    model=model,
+    args=training_args,
+    train_dataset=train_dataset,
+    data_collator=data_collator,
+    tokenizer=tokenizer,
+)
+
+→Hugging Faceの Trainer を作成
+
+自動で行うこと
+
+・学習ループ
+・勾配計算
+・ロギング
+・モデル保存
+
+#### 【学習開始前のログ】
+
+print("=== ファインチューニング開始 ===")
+print(f"学習データ数: {len(train_dataset)}")
+print(f"推定学習時間: {len(train_dataset) * training_args.num_train_epochs // (training_args.per_device_train_batch_size * training_args.gradient_accumulation_steps)} ステップ")
+
+→学習データ件数を表示、推定ステップ数 を計算して目安を出力、目安 = データ件数 × エポック数 ÷ 実効バッチサイズ
+
+
+#### 【学習実行と時間計測】
+
+start_time = datetime.now()
+model.train()
+train_result = trainer.train()
+end_time = datetime.now()
+training_duration = end_time - start_time
+
+・model.train() → PyTorch的に「学習モード」に切り替え
+・trainer.train() → 実際にファインチューニングを開始
+→学習開始・終了時間を測って 学習時間を表示
+
+#### 【学習結果の表示】
+
+print(f"\n=== 学習完了 ===")
+print(f"学習時間: {training_duration}")
+print(f"最終損失: {train_result.training_loss:.4f}")
+
+・学習後の総時間と 最終損失 を確認
+・損失が大きすぎる場合は、設定を見直す目安になる
+
+#### 【モデルとトークナイザーの保存】
+
+trainer.save_model()
+tokenizer.save_pretrained(training_args.output_dir)
+
+・学習済みモデルとトークナイザーを保存
+・保存先 = training_args.output_dir
+
+#### 【学習履歴の保存】
+
+train_history = {...}
+with open(f"{training_args.output_dir}/training_history.json", 'w') as f:
+    json.dump(train_history, f, indent=2)
+
+→学習履歴（loss・学習時間・エポック数・学習率） をJSONで保存
+
+
+#### 【エラーハンドリング】
+
+except Exception as e:
+    print(f"学習中にエラーが発生: {e}")
+    print("メモリ不足の場合は、バッチサイズを小さくするか、max_lengthを短くしてください")
+    raise
+
+・学習中のエラーをキャッチしてユーザーに原因のヒントを出す
+・例：メモリ不足 → バッチサイズ縮小や max_length の調整を提案
+
+#### 【関数呼び出し】
+
+trainer, train_result = train_chatbot_model(
+    model=model,
+    tokenizer=tokenizer,
+    train_dataset=train_dataset,
+    training_args=training_args,
+    data_collator=data_collator
+)
+
+→関数を呼び出して 実際に学習を開始
+trainer → 学習済みのTrainer（学習済みモデル含む）
+train_result → 学習結果（損失やステップ情報）
+
+
+
+### ◆ コードブロック8の全体の解釈
+
+・GPT-2チャットボットの学習を安全かつ効率的に行い、学習結果とモデルを保存する
+
+　- Trainerを使った簡潔な学習ループ
+　- 学習時間・損失を表示して進捗確認
+　- モデル・トークナイザー・学習履歴を自動保存
+　- 例外処理でエラー時のヒント表示
+　- 再現性を意識した堅牢設計
+
+#### 【備忘録】
+
+・Trainerとは？
+　- モデル学習を自動で行ってくれる便利マネージャー
+
+🔹Trainer の役割
+　
+1.データバッチ処理
+ - train_dataset を data_collator でまとめて、GPU/CPUに渡す
+
+2.順伝播・逆伝播・勾配計算
+ - モデルに入力を入れて損失計算
+ - 勾配を計算して重みを更新
+
+3.勾配累積や学習率スケジュール
+ - gradient_accumulation_steps に応じた累積計算
+ - TrainingArguments の learning_rate やウォームアップに応じて学習率調整
+
+4.ログ出力
+ - 損失や学習率を一定ステップごとに TensorBoardや標準出力に記録
+
+5.モデル保存
+ - save_steps ごとに自動保存
+
+6.評価（任意）
+ - eval_dataset を渡せば定期的に評価も可能
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
