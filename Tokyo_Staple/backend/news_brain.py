@@ -93,7 +93,7 @@ def analyze_news(articles: List[Dict], topic: str = "All", preferences: Optional
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
                 ],
-                model="llama-3.3-70b-versatile", # 最強モデル
+                model="llama-3.3-70b-versatile",
                 response_format={"type": "json_object"},
             )
 
