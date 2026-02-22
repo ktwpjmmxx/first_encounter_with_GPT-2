@@ -17,17 +17,23 @@
 
 ## Key Features
 
-* **Risk Scoring Dashboard**
-  法的リスクを「0〜100」のスコアで定量化。ゲージチャートで直感的に安全性を把握できます。
+### Modern UI/UX
+React + Tailwind CSS による、ダークモード基調の洗練されたダッシュボードデザイン。入力から結果表示までシームレスな体験を提供します。
 
-* **Real-time Analysis**
-  FastAPI と Gemini Flash モデルの連携により、数秒で診断結果が返ってきます。
+<img src="./screenshots/top.png" width="80%" alt="Dashboard Top">
 
-* **Scope Filtering**
-  AIが苦手とする領域（OSSライセンスや倫理問題）をフィルタリングし、ハルシネーションを防ぐガードレール機能を実装。
+### Risk Scoring & Action Items
+法的リスクをスコアで定量化。FastAPIとGeminiの連携により、数秒で構造化された診断結果と具体的な改善案（Action Items）が返ってきます。
+<p align="center">
+  <img src="./screenshots/inf_1.png" height="450" alt="Risk Scoring 1">
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+  <img src="./screenshots/inf_2.png" height="450" alt="Risk Scoring 2">
+</p>
 
-* **Modern UI/UX**
-  React + Tailwind CSS による、ダークモード基調の洗練されたダッシュボードデザイン。
+### Scope Filtering (Guardrails)
+AIが苦手とする領域（技術実装コードや倫理問題）をPython側で事前にフィルタリング。ハルシネーションとAPIコストの無駄遣いを防ぐガードレール機能を実装しています。
+
+<img src="./screenshots/例外.png" width="80%" alt="Scope Filtering">
 
 ## Tech Stack
 
@@ -99,7 +105,7 @@ pip install -r requirements.txt
 # 環境変数の設定
 # .envファイルを作成し、GOOGLE_API_KEY=your_key を記述してください
 
-# サーバー起動 (http://localhost:8000)
+# サーバー起動 (http://localhost:xxxx)
 python main.py
 ```
 
@@ -113,11 +119,11 @@ cd frontend
 # パッケージインストール
 npm install
 
-# 開発サーバー起動 (http://localhost:5173)
+# 開発サーバー起動 (http://localhost:xxxx)
 npm run dev
 ```
 
-ブラウザで `http://localhost:5173` にアクセスすると、Guardian AI が利用可能です。
+ブラウザで `http://localhost:xxxx` にアクセスすると、Guardian AI が利用可能です。
 
 ## Future Roadmap
 
